@@ -16,6 +16,7 @@ local speed = 0.1
 local sound_placing_failed = "default_item_smoke" --"default_cool_lava" --"default_tool_breaks"
 local sound_set_pos = "default_place_node_hard"
 local sound_scan_node = "default_dig_metal"
+local marker_time = 5
 
 local function make_it_one(n)
 	if n<0 then n=-1 end
@@ -64,7 +65,7 @@ local function set_pos(itemstack, pos, player)
 	if minetest.get_node(pos_under).name ~= "air" then
 		minetest.add_particle({
 			pos = pos,
-			expirationtime = 3,
+			expirationtime = marker_time,
 			vertical = true,
 			size = 10,
 			texture = "default_mese_post_light_side.png^[multiply:"..color,
@@ -73,7 +74,7 @@ local function set_pos(itemstack, pos, player)
 	else
 		minetest.add_particle({
 			pos = pos,
-			expirationtime = 3,
+			expirationtime = marker_time,
 			size = 5,
 			texture = "default_meselamp.png^[multiply:"..color,
 			glow = 5
