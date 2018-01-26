@@ -100,10 +100,12 @@ local function get_next_pos(cpos, bpos, epos, dpos)
 end
 
 local function pos_can_place(pos, node_name, player)
-	if not minetest.registered_nodes[minetest.get_node(pos).name].buildable_to then
+	local pnode = minetest.registered_nodes[minetest.get_node(pos).name]
+	local node_under = minetest.registered_nodes[minetest.get_node({x = pos.x, y = pos.y-1, z = pos.z}).name]
+	if not pnode or not pnode.buildable_to then
 		return false
-	elseif minetest.get_item_group(node_name, "attached_node") > 0 and
-			minetest.registered_nodes[minetest.get_node({x = pos.x, y = pos.y-1, z = pos.z}).name].walkable == false then
+	elseif node_under and minetest.get_item_group(node_name, "attached_node") > 0 and
+			node_under.walkable == false then
 		return false
 	end
 	return true
@@ -178,6 +180,9 @@ minetest.register_tool("filler:filler", {
 		end
 		if placer:get_player_control().sneak == true then
 			local node = minetest.get_node(pointed_thing.under)
+			if not minetest.registered_nodes[node.name] then
+				return itemstack
+			end
 			itemstack:get_meta():set_string("node", minetest.serialize(node))
 			minetest.chat_send_player(placer:get_player_name(),
 				"Filling Tool: Node set to "..
@@ -192,6 +197,9 @@ minetest.register_tool("filler:filler", {
 		local pos = vector.round(user:get_pos())
 		if user:get_player_control().sneak == true then
 			local node = minetest.get_node(pos)
+			if not minetest.registered_nodes[node.name] then
+				return itemstack
+			end
 			itemstack:get_meta():set_string("node", minetest.serialize(node))
 			minetest.chat_send_player(user:get_player_name(),
 				"Filling Tool: Node set to "..
