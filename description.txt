@@ -1,0 +1,1 @@
+Adds a Filling Tool which can fill areas.
