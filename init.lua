@@ -9,7 +9,7 @@ filler.blacklist["protector:protect2"] = true
 
 filler.placing_from_top_to_bottom["air"] = true
 
-local max_volume = 1000
+local max_volume = 32^3
 local color_pos1 = "#ffbb00"
 local color_pos2 = "#00bbff"
 local speed = 0.1
@@ -224,7 +224,7 @@ minetest.register_tool("filler:filler", {
 		local pos1 = minetest.string_to_pos(meta:get_string("pos1"))
 		local pos2 = minetest.string_to_pos(meta:get_string("pos2"))
 		local node = minetest.deserialize(meta:get_string("node"))
-		local volume = get_volume(pos1, pos1)
+		local volume = get_volume(pos1, pos2)
 		if not user then return end
 		local inv = user:get_inventory()
 		if not node then
