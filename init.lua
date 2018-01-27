@@ -157,7 +157,7 @@ local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos
 	--minetest.add_node(cpos, node)
 	--minetest.place_node(cpos, node)
 	local node_sounds = minetest.registered_nodes[node.name].sounds
-	if node_sounds and node_sounds.node_sounds then
+	if node_sounds and node_sounds.place then
 		minetest.sound_play(minetest.registered_nodes[node.name].sounds.place, {pos = cpos})
 	else
 		--minetest.sound_play("", {pos = cpos})
