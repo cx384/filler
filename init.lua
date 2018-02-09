@@ -18,6 +18,26 @@ local sound_set_pos = "default_place_node_hard"
 local sound_scan_node = "default_dig_metal"
 local marker_time = 4
 
+local mod_storage = minetest.get_mod_storage()
+
+local function add_rollback_storage(player, pos, node)
+	local t = minetest.deserialize(mod_storage:get_string(player.."_rollback_storage")) or {}
+	table.insert(t, 1, {pos = pos, node = node})
+	mod_storage:set_string(player.."_rollback_storage", minetest.serialize(t))
+end
+
+local function get_rollback_storage(player)
+	local t = minetest.deserialize(mod_storage:get_string(player.."_rollback_storage")) or {}
+	local e = table.remove(t, 1)
+	mod_storage:set_string(player.."_rollback_storage", minetest.serialize(t))
+	return e
+end
+
+local function refresh_rollback_storage(player)
+	local t = minetest.deserialize(mod_storage:get_string(player.."_rollback_storage")) or {}
+	mod_storage:set_string(player.."_rollback_storage", nil)
+end
+
 local function make_it_one(n)
 	if n<0 then n=-1 end
 	if n>0 then n=1 end
@@ -32,33 +52,43 @@ local function get_volume(pos1, pos2)
 	return (math.abs(lv.x)+1) * (math.abs(lv.y)+1) * (math.abs(lv.z)+1)
 end
 
+local function get_pos_infotext(pos1, pos2)
+	local lv = vector.subtract(pos1, pos2)
+	lv.x = math.abs(lv.x)+1
+	lv.y = math.abs(lv.y)+1
+	lv.z = math.abs(lv.z)+1
+	local it = lv.x.."x"..lv.y.."x"..lv.z
+	local volume = lv.x*lv.y*lv.z
+	if volume > max_volume then
+		it = it.." = "..minetest.colorize("#ff0000", volume.." Blocks")
+	else
+		it = it.." = "..volume.." Blocks"
+	end
+	return it
+end
+
 local function set_pos(itemstack, pos, player)
 	local pos_name = minetest.pos_to_string(pos)
 	local meta = itemstack:get_meta()
 	local turner = meta:get_int("turner")
 	local color = color_pos1
+	local pos1 = minetest.string_to_pos(meta:get_string("pos1")) or {x=0,y=0,z=0}
+	local pos2 = minetest.string_to_pos(meta:get_string("pos2")) or {x=0,y=0,z=0}
 	if turner == 1 then
+		pos2 = pos
 		meta:set_string("pos2", pos_name)
 		color = color_pos2
 		turner = 0
 	else
+		pos1 = pos
 		meta:set_string("pos1", pos_name)
 		turner = 1
 	end
 	meta:set_int("turner", turner)
-	local volume = get_volume(minetest.string_to_pos(meta:get_string("pos1")),
-		minetest.string_to_pos(meta:get_string("pos2")))
-	if volume > max_volume then
-		minetest.chat_send_player(player:get_player_name(),
-			"Filling Tool: "..minetest.colorize(color, "Pos")..
-			" set to "..minetest.pos_to_string(pos)..
-			" "..minetest.colorize("#ff0000", volume.." Blocks"))
-	else
-		minetest.chat_send_player(player:get_player_name(),
-			"Filling Tool: "..minetest.colorize(color, "Pos")..
-			" set to "..minetest.pos_to_string(pos)..
-			" "..volume.." Blocks")
-	end
+	minetest.chat_send_player(player:get_player_name(),
+		"Filling Tool: "..minetest.colorize(color, "Pos")..
+		" set to "..pos_name.." "..get_pos_infotext(pos1, pos2)
+	)
 	minetest.sound_play({name = sound_set_pos}, {pos = pos})
 	local pos_under = table.copy(pos)
 	pos_under.y = pos_under.y - 1
@@ -111,6 +141,38 @@ local function pos_can_place(pos, node_name, player)
 	return true
 end
 
+local function rollback_filling(player)
+	local player_name = player:get_player_name()
+	if player:get_attribute("filler_deactivate") == "true" then
+		minetest.chat_send_player(player_name, "Filling Tool: Deactivated.")
+		player:set_attribute("filler_deactivate", "false")
+		player:set_attribute("filler_activated", "false")
+		return
+	end
+	local rollback_storage = get_rollback_storage(player_name)
+	if not rollback_storage or rollback_storage == {} then
+		player:set_attribute("filler_activated", "false")
+		return
+	end
+	local node = minetest.get_node(rollback_storage.pos)
+	while not node.name == rollback_storage.node.name do
+		rollback_storage = get_rollback_storage(player_name)
+		node = minetest.get_node(rollback_storage.pos)
+		if not rollback_storage or rollback_storage == {} then
+			player:set_attribute("filler_activated", "false")
+			return
+		end
+	end
+	minetest.node_dig(rollback_storage.pos, node, player)
+	local node_sounds = minetest.registered_nodes[node.name].sounds
+	if node_sounds and node_sounds.dug then
+		minetest.sound_play(minetest.registered_nodes[node.name].sounds.dug, {pos = rollback_storage.pos})
+	else
+		--minetest.sound_play("", {pos = rollback_storage.pos})
+	end
+	minetest.after(speed, rollback_filling, player)
+end
+
 local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos and inv to improve performance
 	local player_name = player:get_player_name()
 	if player:get_attribute("filler_deactivate") == "true" then
@@ -156,6 +218,8 @@ local function fill_area(cpos, bpos, epos, node, player, dpos, inv) --cpos, dpos
 	-- alternatives
 	--minetest.add_node(cpos, node)
 	--minetest.place_node(cpos, node)
+	
+	add_rollback_storage(player_name, cpos, node)
 	local node_sounds = minetest.registered_nodes[node.name].sounds
 	if node_sounds and node_sounds.place then
 		minetest.sound_play(minetest.registered_nodes[node.name].sounds.place, {pos = cpos})
@@ -264,15 +328,29 @@ minetest.register_tool("filler:filler", {
 		dpos.x = make_it_one(dpos.x)
 		dpos.y = cdpos
 		dpos.z = make_it_one(dpos.z)
+		refresh_rollback_storage(player_name)
 		user:set_attribute("filler_activated", "true")
 		fill_area(cpos, bpos, epos, node, user, dpos, inv)
 	end,
 })
 
+minetest.register_chatcommand("rollbackfilling", {
+	description = "Revert the last filling action",
+	func = function(name, param)
+		local player = minetest.get_player_by_name(name)
+		if player:get_attribute("filler_activated") == "true" then
+			minetest.chat_send_player(name, "Filling Tool: The filling tool is currently working."..
+				" (You can hold sneak and left click to deactivate it.)")
+			return
+		end
+		player:set_attribute("filler_activated", "true")
+		rollback_filling(player)
+	end
+})
+
 minetest.register_on_joinplayer(function(player)
 	player:set_attribute("filler_activated", "false")
 end)
-
 
 minetest.register_craft({
 	output = 'filler:filler',
