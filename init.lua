@@ -181,7 +181,11 @@ local function rollback_filling(player)
 		end
 	end
 	minetest.set_node(rollback_storage.pos, {name="air"})                  -- this more save in case of clay and other things which change shape if dug
-	inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
+	if inv:room_for_item("main", node.name) then
+		inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
+	else
+		minetest.item_drop(ItemStack(node.name), player, rollback_storage.pos)
+	end
 	local node_sounds = minetest.registered_nodes[node.name].sounds
 	if node_sounds and node_sounds.dug then
 		minetest.sound_play(minetest.registered_nodes[node.name].sounds.dug, {pos = rollback_storage.pos})
