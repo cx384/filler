@@ -17,6 +17,8 @@ local sound_placing_failed = "default_item_smoke" --"default_cool_lava" --"defau
 local sound_set_pos = "default_place_node_hard"
 local sound_scan_node = "default_dig_metal"
 local marker_time = 4
+local ownercheck = false  -- set to true makes the device belonging to one user only (anti_griefing)
+local recipe_on = true   -- tool can be crafted
 
 local mod_storage = minetest.get_mod_storage()
 
@@ -65,6 +67,20 @@ local function get_pos_infotext(pos1, pos2)
 		it = it.." = "..volume.." Blocks"
 	end
 	return it
+end
+
+local function check_owner(itemstack,name)
+      local owner = itemstack:get_meta():get_string("owner")
+		if not owner or owner == "" then
+		      itemstack:get_meta():set_string("owner", name)	      
+		end
+		
+		if owner ~= name then
+		    minetest.chat_send_player(name, core.colorize("#ffbb00", ">>> This is not yours <<<"))
+		    return false
+		end
+		
+		return true
 end
 
 local function set_pos(itemstack, pos, player)
@@ -143,6 +159,7 @@ end
 
 local function rollback_filling(player)
 	local player_name = player:get_player_name()
+	local inv = player:get_inventory()
 	if player:get_attribute("filler_deactivate") == "true" then
 		minetest.chat_send_player(player_name, "Filling Tool: Deactivated.")
 		player:set_attribute("filler_deactivate", "false")
@@ -163,7 +180,8 @@ local function rollback_filling(player)
 			return
 		end
 	end
-	minetest.node_dig(rollback_storage.pos, node, player)
+	minetest.set_node(rollback_storage.pos, {name="air"})                  -- this more save in case of clay and other things which change shape if dug
+	inv:add_item("main", node.name)                                        -- in case of rollback, dug items should be returned
 	local node_sounds = minetest.registered_nodes[node.name].sounds
 	if node_sounds and node_sounds.dug then
 		minetest.sound_play(minetest.registered_nodes[node.name].sounds.dug, {pos = rollback_storage.pos})
@@ -291,6 +309,13 @@ minetest.register_tool("filler:filler", {
 		local volume = get_volume(pos1, pos2)
 		if not user then return end
 		local inv = user:get_inventory()
+		
+		-- Ownercheck added here.
+		if ownercheck and not check_owner(itemstack,player_name) then
+		    return itemstack
+		end
+		-- End Ownercheck
+		
 		if not node then
 			minetest.chat_send_player(player_name, "Filling Tool: Hold sneak and right click to select a node.")
 			return
@@ -334,7 +359,7 @@ minetest.register_tool("filler:filler", {
 	end,
 })
 
-minetest.register_chatcommand("rollbackfilling", {
+minetest.register_chatcommand("rsq", {
 	description = "Revert the last filling action",
 	func = function(name, param)
 		local player = minetest.get_player_by_name(name)
@@ -352,11 +377,13 @@ minetest.register_on_joinplayer(function(player)
 	player:set_attribute("filler_activated", "false")
 end)
 
-minetest.register_craft({
-	output = 'filler:filler',
-	recipe = {
-		{'', 'default:mese_post_light', 'default:diamond'},
-		{'', 'default:steel_ingot', 'default:mese_post_light'},
-		{'group:stick', '', ''},
-	}
-})
+if recipe_on then                         -- this tool is a bit dangerous on multiplayer servers
+	  minetest.register_craft({
+		  output = 'filler:filler',
+		  recipe = {
+			  {'', 'default:mese_post_light', 'default:diamond'},
+			  {'', 'default:steel_ingot', 'default:mese_post_light'},
+			  {'group:stick', '', ''},
+		  }
+	  })
+end
