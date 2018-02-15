@@ -130,7 +130,11 @@ local function get_next_pos(cpos, bpos, epos, dpos)
 end
 
 local function pos_can_place(pos, node_name, player)
-	local pnode = minetest.registered_nodes[minetest.get_node(pos).name]
+	local node = minetest.get_node(pos).name
+	if node == "ignore" then
+		return false
+	end
+	local pnode = minetest.registered_nodes[node]
 	local node_under = minetest.registered_nodes[minetest.get_node({x = pos.x, y = pos.y-1, z = pos.z}).name]
 	if not pnode or not pnode.buildable_to then
 		return false
@@ -155,13 +159,13 @@ local function rollback_filling(player)
 		return
 	end
 	local node = minetest.get_node(rollback_storage.pos)
-	while not node.name == rollback_storage.node.name do
+	while node.name ~= rollback_storage.node.name do
 		rollback_storage = get_rollback_storage(player_name)
-		node = minetest.get_node(rollback_storage.pos)
 		if not rollback_storage or rollback_storage == {} then
 			player:set_attribute("filler_activated", "false")
 			return
 		end
+		node = minetest.get_node(rollback_storage.pos)
 	end
 	minetest.node_dig(rollback_storage.pos, node, player)
 	local node_sounds = minetest.registered_nodes[node.name].sounds
